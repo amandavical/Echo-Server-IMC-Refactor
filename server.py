@@ -2,114 +2,163 @@
 import socket
 import json
 
-# create a socket object
-print('ECHO SERVER para cálculo do IMC')
-serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-# get a local machine name
-host = '127.0.0.1'
-port = 9999
+# Body Mass Index (BMI)
+def generate_imc(data):
+    """
+    Calculate the Body Mass Index (BMI) based on the provided data.
 
-# bind to the port
-serverSocket.bind((host, port))
+    Parameters:
+    - data (dict): A dictionary containing the 'altura' (height) and 'peso' (weight) values.
 
-#start listening requests
-serverSocket.listen()
-print('Serviço rodando na porta {}.'.format(port))
+    Returns:
+    - float: The calculated BMI.
+    """
+    height = data['altura']
+    weight = data['peso']
+    return round(float(weight / (height * height)), 2)
 
-while True:
-    # establish a connection
-    clientSocket, addr = serverSocket.accept()
-    print('Conectado a {}'.format(str(addr)))
 
-    # recive client data
-    received = clientSocket.recv(1024).decode()
+# BMI Status
+def analyse_imc(imc):
+    """
+    Analyze the Body Mass Index (BMI) and determine its status.
 
-    print('Os dados recebidos do cliente são: {}'.format(received))
+    Parameters:
+    - imc (float): The calculated BMI value.
 
-    # server processing
-    received = json.loads(received)
+    Returns:
+    - str: The status of the BMI.
+    """
+    if 0 < imc < 18.5:
+        status = "Underweight!"
+    elif imc <= 24.9:
+        status = "Normal weight!"
+    elif imc <= 29.9:
+        status = "Overweight!"
+    elif imc <= 34.9:
+        status = "Obesity Class 1!"
+    elif imc <= 39.9:
+        status = "Obesity Class 2!"
+    elif imc <= 40.0:
+        status = "Obesity Class 1!"
+    else:
+        status = "Invalid values"
+    return status
 
-    # IMC (Indice de Massa Corporal)
-    def generateImc(dict):
-        h = dict['altura']
-        p = dict['peso']
-        return round(float(p / (h * h)), 2)
 
-    # adding the imc to data sent by the user
-    received['imc'] = generateImc(received)
+# Basal Metabolic Rate (BMR)
+def generate_tmb(data):
+    """
+    Calculate the Basal Metabolic Rate (BMR) based on the provided data.
 
-    # Status IMC
-    def analyseImc(imc):
-        if imc > 0 and imc < 18.5:
-            status = "Abaixo do Peso!"
-        elif imc <= 24.9:
-            status = "Peso normal!"
-        elif imc <= 29.9:
-            status = "Sobrepeso!"
-        elif imc <= 34.9:
-            status = "Obesidade Grau 1!"
-        elif imc <= 39.9:
-            status = "Obesidade Grau 2!"
-        elif imc <= 40.0:
-            status = "Obesidade Grau 1!"
-        else:
-            status = "Valores inválidos"
-        return status
+    Parameters:
+    - data (dict): A dictionary containing the 'sexo' (sex), 'peso' (weight),
+    'altura' (height), and 'idade' (age) values.
 
-    # adding the status of the imc to data sent by the user
-    received['statusImc'] = analyseImc(received['imc'])
+    Returns:
+    - float: The calculated BMR.
+    """
+    sex = data['sexo']
+    if sex in 'Mm':
+        tmb = 5 + (10 * data['peso']) + (6.25 * (data['altura'] * 100)) - (5 * data['idade'])
+    else:
+        tmb = (10 * data['peso']) + (6.25 * (data['altura'] * 100)) - (5 * data['idade']) - 5
+    return tmb
 
-    # TMB (Taxa Metabólica Basal)
-    def generateTMB(dict):
-        sex = dict['sexo']
 
-        if sex in 'Mm':
-            tmb = 5 + (10 * dict['peso']) + (6.25 * (dict['altura'] * 100)) - (5 * dict['idade'])
+def generate_cal(data):
+    """
+    Calculate the daily caloric intake based on the provided data.
 
-        else:
-            tmb = (10 * dict['peso']) + (6.25 * (dict['altura'] * 100)) - (5 * dict['idade']) - 5
+    Parameters:
+    - data (dict): A dictionary containing the 'nvlAtiv' (activity level) and 'tmb' (basal metabolic rate) values.
 
-        return tmb
+    Returns:
+    - float: The calculated daily caloric intake.
+    """
+    if data['nvlAtiv'] == 1:
+        fator_ativ = 1.2
+    elif data['nvlAtiv'] == 2:
+        fator_ativ = 1.375
+    elif data['nvlAtiv'] == 3:
+        fator_ativ = 1.725
+    else:
+        fator_ativ = 1.9
+    return round((data['tmb'] * fator_ativ), 2)
 
-    # adding the tmb to data sent by the user
-    received['tmb'] = generateTMB(received)
 
-    def generateCal(dict):
-        if dict['nvlAtiv'] == 1:
-            fatorAtiv = 1.2
+def generate_nutrients(data):
+    """
+    Calculate the recommended nutrient intake based on the provided data.
 
-        elif dict['nvlAtiv'] == 2:
-            fatorAtiv = 1.375
+    Parameters:
+    - data (dict): A dictionary containing the 'cal' (calories) value.
 
-        elif dict['nvlAtiv'] == 3:
-            fatorAtiv = 1.725
+    Returns:
+    - dict: A dictionary containing the calculated values for 'carboidratos' (carbohydrates),
+    'proteinas' (proteins), and 'gorduras' (fats).
+    """
+    carb = str(round((data['cal'] * 0.45), 2))
+    prot = str(round((data['cal'] * 0.3), 2))
+    fat = str(round((data['cal'] * 0.25), 2))
+    return {"carboidratos": carb, "proteinas": prot, "gorduras": fat}
 
-        else:
-            fatorAtiv = 1.9
 
-        return round((dict['tmb'] * fatorAtiv), 2)
+def run_server():
+    # Create a socket object
+    print('ECHO SERVER for BMI calculation')
+    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-    # adding the cal to data sent by the user
-    received['cal'] = generateCal(received)
+    # Get the local machine name
+    host = '127.0.0.1'
+    port = 9999
 
-    def generateNutrients(dict):
-        carb = str(round((dict['cal'] * 0.45), 2))
-        prot = str(round((dict['cal'] * 0.3), 2))
-        fat = str(round((dict['cal'] * 0.25), 2))
+    # Bind to the port
+    server_socket.bind((host, port))
 
-        return {"carboidratos": carb, "proteinas": prot, "gorduras": fat}
+    # Start listening for requests
+    server_socket.listen()
+    print('Service running on port {}.'.format(port))
 
-    # adding the nutrients to data sent by the user
-    received["nutrientes"] = generateNutrients(received)
-    print('O resultado do processamento é {}'.format(received))
+    while True:
+        # Establish a connection
+        client_socket, addr = server_socket.accept()
+        print('Connected to {}'.format(str(addr)))
 
-    # serialising
-    result = json.dumps(received)
+        # Receive client data
+        received = client_socket.recv(1024).decode()
 
-    # send a result
-    clientSocket.send(result.encode('ascii'))
-    print('Os dados do cliente foram enviados com sucesso!')
+        print('Received data from the client: {}'.format(received))
 
-    # finish a connection
-    clientSocket.close()
+        # Server processing
+        received = json.loads(received)
+
+        # Add the BMI to data sent by the user
+        received['imc'] = generate_imc(received)
+
+        # Add the status of the BMI to data sent by the user
+        received['statusImc'] = analyse_imc(received['imc'])
+
+        # Add the BMR to data sent by the user
+        received['tmb'] = generate_tmb(received)
+
+        # Add the daily caloric intake to data sent by the user
+        received['cal'] = generate_cal(received)
+
+        # Add the nutrients to data sent by the user
+        received["nutrientes"] = generate_nutrients(received)
+        print('The result of processing is {}'.format(received))
+
+        # Serializing the result
+        result = json.dumps(received)
+
+        # Send the result
+        client_socket.send(result.encode('ascii'))
+        print('Client data sent successfully!')
+
+        # Finish the connection
+        client_socket.close()
+
+
+run_server()
